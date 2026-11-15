@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}People{% endblock %}
+{% block body %}
+<h1>People</h1>
+<form class="sheet" method="post" action="/people/new">
+  <label>Name <input name="name" required></label>
+  <label>Email <input name="email" type="email"></label>
+  <label>Phone <input name="phone"></label>
+  <label>Address <textarea name="address"></textarea></label>
+  <button type="submit">Add customer</button>
+</form>
+{% if customers %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col" class="num">Owes</th></tr></thead>
+  <tbody>
+  {% for c in customers %}
+    <tr>
+      <td><a href="/people/{{ c.id }}">{{ c.name }}</a></td>
+      <td>{{ c.email or "" }}</td>
+      <td class="num">{{ c.owed_cents | money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% if archived %}
+<details>
+  <summary>Archived ({{ archived | length }})</summary>
+  <ul>{% for c in archived %}<li><a href="/people/{{ c.id }}">{{ c.name }}</a></li>{% endfor %}</ul>
+</details>
+{% endif %}
+<h2>Pipeline</h2>
+{% if deals %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Deal</th><th scope="col">Customer</th><th scope="col">Stage</th><th scope="col" class="num">Value</th></tr></thead>
+  <tbody>
+  {% for d in deals %}
+    <tr>
+      <td>{{ d.title }}</td>
+      <td>{{ d.customer_name or "" }}</td>
+      <td>{{ d.stage }}</td>
+      <td class="num">{{ d.value_cents | money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+<form class="sheet" method="post" action="/pipeline">
+  <label>Deal <input name="title" required placeholder="Cafe shelves"></label>
+  <label>Customer
+    <select name="customer_id">
+      <option value="">No customer</option>
+      {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Value <input name="value" value="0"></label>
+  <label>Stage
+    <select name="stage">
+      <option value="lead">Lead</option>
+      <option value="quoted">Quoted</option>
+      <option value="won">Won</option>
+      <option value="lost">Lost</option>
+    </select>
+  </label>
+  <button>Add deal</button>
+</form>
+{% endblock %}

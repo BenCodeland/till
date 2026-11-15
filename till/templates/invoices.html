@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Invoices{% endblock %}
+{% block body %}
+<div class="row">
+  <h1>{{ "Quotes" if kind=="quote" else "Invoices" }}</h1>
+  <div class="actions">
+    <a class="btn" href="{{ '/quotes/new' if kind=='quote' else '/invoices/new' }}">New {{ kind }}</a>
+    {% if kind=="quote" %}
+      <a class="btn quiet" href="/invoices">Invoices</a>
+    {% else %}
+      <a class="btn quiet" href="/invoices?kind=quote">Quotes</a>
+    {% endif %}
+  </div>
+</div>
+{% if invoices %}
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr><th scope="col">No.</th><th scope="col">Customer</th><th scope="col" class="wide-only">Date</th><th scope="col">Status</th><th scope="col" class="num">Total</th><th scope="col" class="num">Owed</th></tr>
+  </thead>
+  <tbody>
+  {% for i in invoices %}
+    <tr class="{{ 'overdue' if i.overdue }}">
+      <td class="nowrap"><a href="/invoices/{{ i.id }}">{{ i.number }}</a></td>
+      <td>{{ i.customer_name }}</td>
+      <td class="wide-only nowrap">{{ i.issue_date }}</td>
+      <td><span class="stamp {{ 'overdue' if i.overdue else i.status }}">{{ "overdue" if i.overdue else i.status }}</span></td>
+      <td class="num">{{ i.total_cents | money(i.currency) }}</td>
+      <td class="num">{{ i.balance_cents | money(i.currency) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="lede">No {{ kind }}s yet. <a href="/invoices/new">Write the first one.</a></p>
+{% endif %}
+
+{% if kind != "quote" %}
+<h2>Retainers</h2>
+<p class="lede">A monthly (or weekly) draft, waiting for you to send. <code>till tick</code> issues whatever is due.</p>
+{% if recurring %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Customer</th><th scope="col">Cadence</th><th scope="col">Next</th><th scope="col">Line</th><th scope="col"></th></tr></thead>
+  <tbody>
+  {% for r in recurring %}
+    <tr>
+      <td>{{ r.customer_name }}</td>
+      <td>{{ r.cadence }}</td>
+      <td>{{ r.next_date }}</td>
+      <td>{{ r.template.lines[0].description if r.template.lines else "" }}</td>
+      <td>
+        {% if r.active %}
+        <form method="post" action="/recurring/{{ r.id }}/stop"><button class="quiet" type="submit">Stop<span class="vh"> retainer for {{ r.customer_name }}</span></button></form>
+        {% else %}
+        stopped
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<form method="post" action="/tick" class="actions">
+  <button type="submit">Issue due retainers</button>
+</form>
+{% endif %}
+<form class="sheet" method="post" action="/recurring">
+  <label>Customer
+    <select name="customer_id" required>
+      {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Cadence
+    <select name="cadence">
+      <option value="monthly">Monthly</option>
+      <option value="weekly">Weekly</option>
+      <option value="yearly">Yearly</option>
+    </select>
+  </label>
+  <label>Next date <input type="date" name="next_date" value="{{ today }}"></label>
+  <label>Description <input name="description" value="Monthly retainer" required></label>
+  <label>Qty <input name="qty" value="4"></label>
+  <label>Rate <input name="unit" value="80.00"></label>
+  <label>Tax % <input name="tax_pct" type="number" step="any" min="0" max="100" inputmode="decimal" placeholder="8.25" value="0"></label>
+  <button>Add retainer</button>
+</form>
+{% endif %}
+{% endblock %}

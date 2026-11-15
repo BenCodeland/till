@@ -1,0 +1,18 @@
+# Template for `till install`, which fills in the @...@ values and writes the
+# result to ~/.config/systemd/user/till.service. Nothing here is used as is.
+[Unit]
+Description=Till local daybook
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@WORKDIR@
+ExecStart=@TILL@ serve --port @PORT@
+Environment=@DB@
+Environment=TILL_PORT=@PORT@
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

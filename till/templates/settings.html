@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block body %}
+<h1>Settings</h1>
+<p class="lede">Your business details print on every invoice. Leave a field empty and it doesn't print.</p>
+<form class="sheet" method="post" action="/settings">
+  <label>Business name <input name="name" value="{{ company.name }}" required></label>
+  <div class="pair">
+    <label>Email <input name="email" type="email" value="{{ company.email or "" }}"></label>
+    <label>Phone <input name="phone" value="{{ company.phone or "" }}"></label>
+  </div>
+  <label>Address <textarea name="address">{{ company.address or "" }}</textarea></label>
+  <label>Tax number (EIN, ABN, VAT, GST; optional) <input name="tax_id" value="{{ company.tax_id or "" }}"></label>
+  <div class="pair">
+    {% if currency_locked %}
+    <div id="currency-locked">
+      <span class="label">Currency</span>
+      <p><strong>{{ company.currency }} · {{ currencies.get(company.currency, company.currency) }}</strong></p>
+      <p class="hint">{{ currency_locked_text }}</p>
+    </div>
+    {% else %}
+    <label>Currency
+      <select name="currency">
+        {% for code, name in currencies.items() %}
+        <option value="{{ code }}"{{ ' selected' if code == company.currency }}>{{ code }} · {{ name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label>Default tax % <input name="default_tax_pct" value="{{ company.default_tax_bps | pct }}" type="number" step="any" min="0" max="100" inputmode="decimal" placeholder="8.25"></label>
+  </div>
+  {% if not currency_locked %}<p class="hint">Choose it before you send your first invoice: drafts and quotes switch with it, and once anything is sent or in the books it stays: Till keeps one currency per book.</p>{% endif %}
+  <p class="hint">The default tax fills in on each new invoice line; you can still change it per line. Use 0 if you don't charge sales tax.</p>
+  <label>Payment instructions (printed under "How to pay")
+    <textarea name="payment_instructions" placeholder="Bank transfer to: Dana's Plumbing, account 12-3456-7890123&#10;Please use the invoice number as the reference.">{{ company.payment_instructions or "" }}</textarea>
+  </label>
+  <button type="submit">Save settings</button>
+</form>
+
+{% if company.is_demo %}
+<section id="start-fresh" class="fix">
+  <h2>Start your own book</h2>
+  <p>This book is sample data, for trying Till out. Your own book is a separate file that starts empty, so nothing you do here reaches it.</p>
+  {% if is_real_file %}
+  <p>This sample data is in the file your own book uses (<code>{{ db_path }}</code>), probably from an older <code>till seed</code>. To start your own book:</p>
+  <ol>
+    <li>Stop Till.</li>
+    <li>Move that file somewhere else (keep it if you like).</li>
+    <li>Start Till again with <code>till serve</code>. It makes a new, empty book in the same place, and this notice goes away.</li>
+  </ol>
+  <p class="hint">To look at sample data again later, use <code>till demo</code>: it keeps the sample business in its own book.</p>
+  {% else %}
+  <ol>
+    <li>Stop this sample (Ctrl+C where <code>till demo</code> is running).</li>
+    <li>Run <code>till serve</code> and open <code>{{ real_url }}</code>. Your own book is <code>{{ real_db }}</code>.</li>
+  </ol>
+  <p class="hint">The sample book stays at <code>{{ db_path }}</code> for next time you run <code>till demo</code>.</p>
+  {% endif %}
+</section>
+{% endif %}
+
+<details class="advanced">
+  <summary>Advanced</summary>
+  <p class="hint">The books live in a SQLite file on this machine: <code>{{ db_path }}</code>. Other programs on this computer can read and write them through the local API at <code>/api</code>.</p>
+</details>
+{% endblock %}

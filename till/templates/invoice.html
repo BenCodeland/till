@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.number }}{% endblock %}
+{% block body %}
+<div class="row">
+  <h1>{{ invoice.number }}
+    <span class="stamp {{ 'overdue' if invoice.overdue else invoice.status }}">{{ "overdue" if invoice.overdue else invoice.status }}</span>
+  </h1>
+  <a class="btn quiet" href="/invoices/{{ invoice.id }}/print">Print or save as PDF</a>
+</div>
+<p class="lede">
+  <a href="/people/{{ invoice.customer_id }}">{{ invoice.customer_name }}</a>
+  · issued {{ invoice.issue_date }}
+  {% if invoice.due_date %} · due {{ invoice.due_date }}{% endif %}
+</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Description</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Rate</th><th scope="col" class="num">Tax</th><th scope="col" class="num">Amount</th></tr></thead>
+  <tbody>
+  {% for line in invoice.lines %}
+    <tr>
+      <td>{{ line.description }}</td>
+      <td class="num">{{ line.qty_milli | qty }}</td>
+      <td class="num">{{ line.unit_cents | money(invoice.currency) }}</td>
+      <td class="num">{{ line.tax_cents | money(invoice.currency) }}{% if line.tax_bps %}<span class="sub">{{ line.tax_bps | pct }}%</span>{% endif %}</td>
+      <td class="num">{{ line.line_cents | money(invoice.currency) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr><td colspan="4">Subtotal</td><td class="num">{{ invoice.subtotal_cents | money(invoice.currency) }}</td></tr>
+    <tr><td colspan="4">Tax</td><td class="num">{{ invoice.tax_cents | money(invoice.currency) }}</td></tr>
+    <tr><td colspan="4">Total</td><td class="num">{{ invoice.total_cents | money(invoice.currency) }}</td></tr>
+    <tr><td colspan="4">Paid</td><td class="num">{{ invoice.paid_cents | money(invoice.currency) }}</td></tr>
+    <tr class="balance"><td colspan="4">Balance</td><td class="num">{{ invoice.balance_cents | money(invoice.currency) }}</td></tr>
+  </tfoot>
+</table>
+</div>
+{% if invoice.notes %}<p>{{ invoice.notes }}</p>{% endif %}
+
+{% if invoice.status == 'draft' and invoice.kind == 'invoice' %}
+<p class="hint">Till doesn't email. Open <a href="/invoices/{{ invoice.id }}/print">the print view</a>, print it or save it as a PDF, and send it to {{ invoice.customer_name }} yourself. Then mark it as sent, so it counts as money you're owed.</p>
+{% endif %}
+<div class="actions">
+  {% if invoice.status == 'draft' and invoice.kind == 'invoice' %}
+  <form method="post" action="/invoices/{{ invoice.id }}/send"><button type="submit">Mark as sent</button></form>
+  {% endif %}
+  {% if invoice.kind == 'quote' and invoice.status not in ('converted', 'deleted', 'void') %}
+  <form method="post" action="/quotes/{{ invoice.id }}/convert"><button type="submit">Convert to invoice</button></form>
+  {% endif %}
+  {% if invoice.status == 'draft' %}
+  <a class="btn quiet" href="/invoices/{{ invoice.id }}/edit">Edit {{ invoice.kind }}</a>
+  {% endif %}
+</div>
+
+{% if invoice.payments %}
+<h2>Payments received</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Date</th><th scope="col">Method</th><th scope="col" class="num">Amount</th><th scope="col">Reversed?</th></tr></thead>
+  <tbody>
+  {% for p in invoice.payments %}
+    <tr class="{{ 'reversed' if p.reversed_at }}">
+      <td>{{ p.paid_at }}</td>
+      <td>{{ methods.get(p.method, p.method | capitalize) }}</td>
+      <td class="num">{{ p.amount_cents | money(invoice.currency) }}</td>
+      <td>
+        {% if p.reversed_at %}Reversed {{ p.reversed_at[:10] }}
+        {% else %}
+        No
+        <details class="confirm">
+          <summary>Reverse…</summary>
+          <form method="post" action="/invoices/{{ invoice.id }}/payments/{{ p.id }}/reverse">
+            <p class="lede">Takes {{ p.amount_cents | money(invoice.currency) }} back off the cash and puts it back on the balance.</p>
+            <button type="submit">Yes, reverse this payment</button>
+          </form>
+        </details>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+{% if invoice.status in ('sent','partial') %}
+<h2>Record a payment</h2>
+<form class="sheet" method="post" action="/invoices/{{ invoice.id }}/pay">
+  <label>Amount received <input name="amount" value="{{ '%.2f' % (invoice.balance_cents / 100) }}" inputmode="decimal" required></label>
+  <div class="pair">
+    <label>Date <input type="date" name="paid_at" value="{{ today }}"></label>
+    <label>Method
+      <select name="method">
+        {% for value, label in methods.items() %}
+        <option value="{{ value }}"{{ ' selected' if value == last_method }}>{{ label }}</option>
+        {% endfor %}
+        {% if last_method not in methods %}<option value="{{ last_method }}" selected>{{ last_method }}</option>{% endif %}
+      </select>
+    </label>
+  </div>
+  <div class="actions">
+    <button type="submit">Record payment</button>
+  </div>
+</form>
+{% endif %}
+
+{% if chase %}
+{# Overdue: a chase. Sent but not yet due: the same email phrased as a friendly reminder. #}
+<form class="sheet">
+  <label>{{ "Chase" if chase.overdue else "Send a reminder" }}
+    <textarea readonly rows="7">{{ chase.body }}</textarea>
+  </label>
+  <div class="actions">
+    <a class="btn quiet" href="{{ chase.mailto }}">Open in your email app</a>
+  </div>
+</form>
+{% endif %}
+
+{% if invoice.status == 'draft' or invoice.status in ('sent', 'partial') %}
+<section class="fix" aria-labelledby="fix-heading">
+  <h2 id="fix-heading">Fix a mistake</h2>
+  {% if invoice.status == 'draft' %}
+  <p class="hint">A wrong number or line? <a href="/invoices/{{ invoice.id }}/edit">Edit the {{ invoice.kind }}</a>. Or throw it away:</p>
+  <details class="confirm">
+    <summary>Delete draft…</summary>
+    <form method="post" action="/invoices/{{ invoice.id }}/delete">
+      <p class="lede">Nothing has been posted for {{ invoice.number }}. Deleting hides it; its number is not used again.</p>
+      <button type="submit" class="danger">Yes, delete {{ invoice.number }}</button>
+    </form>
+  </details>
+  {% elif invoice.paid_cents %}
+  <p class="hint">To void this invoice, reverse its payments first (under Payments received).</p>
+  {% else %}
+  <details class="confirm">
+    <summary>Void this invoice…</summary>
+    <form method="post" action="/invoices/{{ invoice.id }}/void">
+      <p class="lede">Voiding takes {{ invoice.number }} back out of income and what you're owed. It can't be undone.</p>
+      <button type="submit" class="danger">Yes, void {{ invoice.number }}</button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

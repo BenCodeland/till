@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}{{ heading or ("New " ~ (kind | default('invoice'))) }}{% endblock %}
+{% macro line_row(line, n) -%}
+<tr class="line">
+  <td class="d" data-label="Description"><label><span class="vh" data-name="Description">Description, line {{ n }}</span><input name="description" placeholder="Labour, a part, a callout" list="products" value="{{ line.description }}"{{ ' required' if n == 1 }}></label></td>
+  <td class="q" data-label="Qty"><label><span class="vh" data-name="Quantity">Quantity, line {{ n }}</span><input name="qty" value="{{ line.qty }}" inputmode="decimal" autocomplete="off"></label></td>
+  <td class="u" data-label="Rate"><label><span class="vh" data-name="Rate">Rate, line {{ n }}</span><input name="unit" value="{{ line.unit }}" inputmode="decimal" autocomplete="off" placeholder="95.00"></label></td>
+  <td class="t" data-label="Tax %"><label><span class="vh" data-name="Tax %">Tax %, line {{ n }}</span><input name="tax_pct" value="{{ line.tax_pct }}" type="number" step="any" min="0" max="100" inputmode="decimal" placeholder="8.25"></label></td>
+  <td class="a num" data-label="Amount"><output class="line-amount"></output></td>
+  <td class="x"><button type="button" class="quiet remove-line" hidden>Remove<span class="vh"> line {{ n }}</span></button></td>
+</tr>
+{%- endmacro %}
+{% block body %}
+<h1>{{ heading or ("New " ~ (kind | default('invoice'))) }}</h1>
+{% if not customers %}
+<p class="lede">Add a customer first. <a href="/people">People</a></p>
+{% else %}
+{% if currency_change %}<p class="hint">This draft is in {{ currency_change[0] }}. Saving it puts it in {{ currency_change[1] }}, this book's currency; the amounts stay as they are.</p>{% endif %}
+<form class="sheet wide" method="post" action="{{ action }}" id="invoice-form" data-currency="{{ currency_prefix }}">
+  <label>Customer
+    <select name="customer_id" required>
+      {% for c in customers %}
+        <option value="{{ c.id }}" {{ 'selected' if customer_id and c.id == customer_id|int }}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="pair">
+    <label>Issue date <input type="date" name="issue_date" value="{{ issue_date }}"></label>
+    <label>Due date <input type="date" name="due_date" value="{{ due_date }}"></label>
+  </div>
+  {% if jobs %}
+  <label>Job
+    <select name="job_id">
+      <option value="">No job</option>
+      {% for j in jobs %}
+        <option value="{{ j.id }}" {{ 'selected' if job_id and j.id == job_id|int }}>{{ j.title }} · {{ j.customer_name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <fieldset class="lines-box">
+    <legend>Lines</legend>
+    <div class="table-wrap">
+    <table class="lines" id="lines">
+      <thead><tr><th scope="col">Description</th><th scope="col">Qty</th><th scope="col">Rate</th><th scope="col">Tax %</th><th scope="col" class="num">Amount</th><th scope="col"><span class="vh">Remove</span></th></tr></thead>
+      <tbody>
+        {% for line in lines %}{{ line_row(line, loop.index) }}{% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <template id="line-template">{{ line_row(blank_line, 0) }}</template>
+    <button type="button" class="quiet" id="add-line" hidden>Add another line</button>
+    <noscript><p class="hint">Fill in as many rows as you need; empty rows are left out. The totals show once you save.</p></noscript>
+    <dl class="totals" id="totals" hidden>
+      <div><dt>Subtotal</dt><dd><output id="subtotal" class="money">—</output></dd></div>
+      <div><dt>Tax</dt><dd><output id="tax-total" class="money">—</output></dd></div>
+      <div class="grand"><dt>Total</dt><dd><output id="grand-total" class="money">—</output></dd></div>
+    </dl>
+    <p class="hint" id="totals-hint" role="status"></p>
+  </fieldset>
+  <datalist id="products">
+    {% for p in products %}<option value="{{ p.name }}"></option>{% endfor %}
+  </datalist>
+  <label>Notes <textarea name="notes">{{ notes or "" }}</textarea></label>
+  <button type="submit">Save draft</button>
+</form>
+<script>
+(function () {
+  // totals:begin
+  // The same arithmetic as the server (till/money.py): amounts in whole
+  // cents, quantity in thousandths, tax in hundredths of a percent; each
+  // line rounded half up to the cent, then its tax rounded half up.
+  function units(text, places, symbols) {
+    var s = String(text == null ? "" : text).trim();
+    var re = symbols ? /^[$£€]?(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d*))?$/ : /^(\d{1,3}(?:,\d{3})+|\d*)(?:\.(\d*))?$/;
+    var m = re.exec(s);
+    if (!m) return null;
+    var whole = m[1].replace(/,/g, ""), frac = m[2] || "";
+    if (!whole && !frac) return null;
+    if (frac.length > places) return null;
+    while (frac.length < places) frac += "0";
+    var scale = BigInt(Math.pow(10, places));
+    return BigInt(whole || "0") * scale + BigInt(frac || "0");
+  }
+  function lineTotals(qty, unit, tax) {
+    qty = String(qty == null ? "" : qty).trim();
+    unit = String(unit == null ? "" : unit).trim();
+    tax = String(tax == null ? "" : tax).trim().replace(/%$/, "");
+    var q = units(qty === "" ? "1" : qty, 3, false);
+    var u = units(unit === "" ? "0" : unit, 2, true);
+    var t = units(tax === "" ? "0" : tax, 2, false);
+    if (q === null || u === null || t === null || q <= BigInt(0) || t > BigInt(10000)) return null;
+    var line = (q * u + BigInt(500)) / BigInt(1000);
+    return { line: line, tax: (line * t + BigInt(5000)) / BigInt(10000) };
+  }
+  function tillTotals(rows) {
+    var sub = BigInt(0), tax = BigInt(0);
+    for (var i = 0; i < rows.length; i++) {
+      var r = lineTotals(rows[i].qty, rows[i].unit, rows[i].tax);
+      if (r === null) return null;
+      sub += r.line;
+      tax += r.tax;
+    }
+    return { subtotal: Number(sub), tax: Number(tax), total: Number(sub + tax) };
+  }
+  // totals:end
+
+  var form = document.getElementById("invoice-form");
+  if (!form || typeof BigInt === "undefined") return;
+  var prefix = form.getAttribute("data-currency") || "$";
+  var tbody = document.querySelector("#lines tbody");
+  var template = document.getElementById("line-template");
+  var addBtn = document.getElementById("add-line");
+  var hint = document.getElementById("totals-hint");
+  var out = {
+    sub: document.getElementById("subtotal"),
+    tax: document.getElementById("tax-total"),
+    total: document.getElementById("grand-total")
+  };
+
+  function money(cents) {
+    var c = BigInt(cents), sign = c < BigInt(0) ? "-" : "";
+    if (sign) c = -c;
+    var whole = (c / BigInt(100)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    var frac = (c % BigInt(100)).toString().padStart(2, "0");
+    return sign + prefix + whole + "." + frac;
+  }
+  function rows() { return Array.prototype.slice.call(tbody.querySelectorAll("tr.line")); }
+  function field(tr, name) { return tr.querySelector('[name="' + name + '"]'); }
+
+  function renumber() {
+    var all = rows();
+    all.forEach(function (tr, i) {
+      tr.querySelectorAll(".vh[data-name]").forEach(function (el) {
+        el.textContent = el.getAttribute("data-name") + ", line " + (i + 1);
+      });
+      var remove = tr.querySelector(".remove-line");
+      remove.hidden = all.length < 2;
+      remove.querySelector(".vh").textContent = " line " + (i + 1);
+      field(tr, "description").required = i === 0;
+    });
+  }
+
+  function update() {
+    var sub = BigInt(0), tax = BigInt(0), bad = [];
+    rows().forEach(function (tr, i) {
+      var cell = tr.querySelector(".line-amount");
+      if (!field(tr, "description").value.trim()) { cell.textContent = ""; return; }
+      var r = lineTotals(field(tr, "qty").value, field(tr, "unit").value, field(tr, "tax_pct").value);
+      if (r === null) { cell.textContent = "?"; bad.push(i + 1); return; }
+      cell.textContent = money(r.line);
+      sub += r.line;
+      tax += r.tax;
+    });
+    out.sub.textContent = money(sub);
+    out.tax.textContent = money(tax);
+    out.total.textContent = money(sub + tax);
+    hint.textContent = bad.length
+      ? "Check line " + bad.join(", ") + ": a quantity, rate or tax isn't a number Till can use."
+      : "";
+  }
+
+  function addLine() {
+    var tr = template.content.querySelector("tr").cloneNode(true);
+    tbody.appendChild(tr);
+    renumber();
+    update();
+    field(tr, "description").focus();
+  }
+
+  addBtn.hidden = false;
+  document.getElementById("totals").hidden = false;
+  addBtn.addEventListener("click", addLine);
+  tbody.addEventListener("input", update);
+  tbody.addEventListener("click", function (e) {
+    var btn = e.target.closest(".remove-line");
+    if (!btn) return;
+    var tr = btn.closest("tr");
+    var next = tr.nextElementSibling || tr.previousElementSibling;
+    tr.remove();
+    renumber();
+    update();
+    if (next) field(next, "description").focus();
+  });
+  // The server adds blank rows for browsers without JavaScript; here the
+  // "Add another line" button does that job, so drop the trailing blank
+  // rows (keeping at least one row to type into).
+  var all = rows();
+  for (var i = all.length - 1; i > 0 && !field(all[i], "description").value.trim(); i--) {
+    all[i].remove();
+  }
+  renumber();
+  update();
+})();
+</script>
+{% endif %}
+{% endblock %}

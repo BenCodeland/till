@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ invoice.number }} · {{ company.name }}</title>
+  <link rel="stylesheet" href="/static/till.css">
+</head>
+<body class="print-body">
+  {% set taxed = invoice.lines | selectattr("tax_bps") | list %}
+  <div class="screen-only print-hint">
+    <p>To send this {{ invoice.kind }}: use your browser's Print and choose <strong>Save as PDF</strong>, then attach the file to an email. This note and the link below don't print.</p>
+    <p><a href="/invoices/{{ invoice.id }}">Back to {{ invoice.number }}</a></p>
+  </div>
+  <div class="print-sheet">
+    <div class="who">
+      <div>
+        <h1>{{ company.name }}</h1>
+        {% if company.address %}<p class="pre">{{ company.address }}</p>{% endif %}
+        {% if company.email or company.phone %}<p>{{ company.email or "" }}{% if company.email and company.phone %} · {% endif %}{{ company.phone or "" }}</p>{% endif %}
+        {% if company.tax_id %}<p>Tax ID {{ company.tax_id }}</p>{% endif %}
+      </div>
+      <div class="doc">
+        <p><strong>{{ invoice.kind | capitalize }} {{ invoice.number }}</strong></p>
+        <p>Issued {{ invoice.issue_date | long_date }}{% if invoice.due_date %}<br>{{ "Valid until" if invoice.kind == "quote" else "Due" }} {{ invoice.due_date | long_date }}{% endif %}</p>
+        {% if invoice.status in ('paid', 'void', 'draft') %}<p class="stamp {{ invoice.status }}">{{ invoice.status }}</p>{% endif %}
+      </div>
+    </div>
+    <p class="bill-to">
+      <strong>Bill to</strong><br>
+      {{ invoice.customer_name }}
+      {% if invoice.customer_address %}<br><span class="pre">{{ invoice.customer_address }}</span>{% endif %}
+      {% if invoice.customer_email %}<br>{{ invoice.customer_email }}{% endif %}
+    </p>
+    <table>
+      <thead><tr>
+        <th scope="col">Description</th><th scope="col" class="num">Qty</th><th scope="col" class="num">Rate</th>
+        {% if taxed %}<th scope="col" class="num">Tax %</th>{% endif %}
+        <th scope="col" class="num">Amount</th>
+      </tr></thead>
+      <tbody>
+      {% for line in invoice.lines %}
+        <tr>
+          <td>{{ line.description }}</td>
+          <td class="num">{{ line.qty_milli | qty }}</td>
+          <td class="num">{{ line.unit_cents | money(invoice.currency) }}</td>
+          {% if taxed %}<td class="num">{{ line.tax_bps | pct }}%</td>{% endif %}
+          <td class="num">{{ line.line_cents | money(invoice.currency) }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+      {% set span = 4 if taxed else 3 %}
+      <tfoot>
+        <tr><td colspan="{{ span }}">Subtotal</td><td class="num">{{ invoice.subtotal_cents | money(invoice.currency) }}</td></tr>
+        {% if taxed %}<tr><td colspan="{{ span }}">Tax</td><td class="num">{{ invoice.tax_cents | money(invoice.currency) }}</td></tr>{% endif %}
+        <tr><td colspan="{{ span }}">Total</td><td class="num">{{ invoice.total_cents | money(invoice.currency) }}</td></tr>
+        {% if invoice.kind == 'invoice' %}
+        {% if invoice.paid_cents %}<tr><td colspan="{{ span }}">Paid</td><td class="num">{{ invoice.paid_cents | money(invoice.currency) }}</td></tr>{% endif %}
+        <tr class="balance"><td colspan="{{ span }}"><strong>Balance due</strong></td><td class="num"><strong>{{ invoice.balance_cents | money(invoice.currency) }}</strong></td></tr>
+        {% endif %}
+      </tfoot>
+    </table>
+    {% if invoice.kind == 'invoice' and company.payment_instructions %}
+    <section class="how-to-pay">
+      <h2>How to pay</h2>
+      <p class="pre">{{ company.payment_instructions }}</p>
+    </section>
+    {% endif %}
+    {% if invoice.notes %}<p class="pre">{{ invoice.notes }}</p>{% endif %}
+    <p class="thanks">Thank you. {{ company.name }}{% if company.email %} · {{ company.email }}{% endif %}{% if company.phone %} · {{ company.phone }}{% endif %}</p>
+  </div>
+</body>
+</html>

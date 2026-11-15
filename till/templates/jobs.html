@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Jobs{% endblock %}
+{% block body %}
+<h1>Jobs</h1>
+<form class="sheet" method="post" action="/jobs/new">
+  <label>Customer
+    <select name="customer_id" required>
+      <option value="">Choose a customer</option>
+      {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Title <input name="title" required placeholder="Kitchen hinge"></label>
+  <label>Day <input type="date" name="scheduled_for" value="{{ today }}"></label>
+  <div class="pair">
+    <label>Start <input type="time" name="start_time" value="09:00"></label>
+    <label>End <input type="time" name="end_time" value="11:00"></label>
+  </div>
+  <label>Location <input name="location"></label>
+  <button>Schedule</button>
+</form>
+{% if jobs %}
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Job</th><th scope="col">Customer</th><th scope="col">Status</th><th scope="col"><span class="vh">Actions</span></th></tr></thead>
+  <tbody>
+  {% for j in jobs %}
+    <tr>
+      <td>{{ j.title }}{% if j.scheduled_for %}<span class="sub">{{ j.scheduled_for }}</span>{% endif %}</td>
+      <td>{{ j.customer_name }}</td>
+      <td>{{ j.status | replace("_", " ") }}</td>
+      <td class="row-actions">
+        <a class="btn quiet" href="/invoices/new?job_id={{ j.id }}">Invoice<span class="vh"> {{ j.title }}</span></a>
+        {% if j.status != 'done' %}
+        <form method="post" action="/jobs/{{ j.id }}/status">
+          <input type="hidden" name="status" value="done">
+          <button class="quiet" type="submit">Mark done<span class="vh">: {{ j.title }}</span></button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="lede">No jobs. Schedule the next one above.</p>
+{% endif %}
+{% endblock %}

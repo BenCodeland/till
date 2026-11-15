@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Calendar{% endblock %}
+{% block body %}
+<div class="row">
+  <h1>{{ day | weekday }} {{ day | long_date }}</h1>
+  <a class="btn quiet" href="/calendar.ics">Download for your calendar app (.ics)</a>
+</div>
+<div class="week">
+  {% for d in days %}
+  <section>
+    <h3><a href="/calendar?day={{ d }}">{{ d[5:] }}</a></h3>
+    {% for e in by_day[d] %}
+      <a href="/calendar?day={{ d }}">{{ e.start_at[11:16] }} {{ e.title }}</a>
+    {% endfor %}
+  </section>
+  {% endfor %}
+</div>
+<h2>This day</h2>
+{% if events %}
+<div class="table-wrap">
+<table>
+  <tbody>
+  {% for e in events %}
+    <tr>
+      <td>{{ e.start_at[11:16] }}–{{ e.end_at[11:16] }}</td>
+      <td>{{ e.title }}</td>
+      <td>{{ e.customer_name or "" }}</td>
+      <td>{{ e.location or "" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="lede">Clear day.</p>
+{% endif %}
+<form class="sheet" method="post" action="/calendar">
+  <label>Title <input name="title" required></label>
+  <label>Day <input type="date" name="day" value="{{ day }}"></label>
+  <label>Start <input type="time" name="start_time" value="09:00"></label>
+  <label>End <input type="time" name="end_time" value="10:00"></label>
+  <label>Customer
+    <select name="customer_id">
+      <option value="">No customer</option>
+      {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Where <input name="location"></label>
+  <button type="submit">Add to the calendar</button>
+</form>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Today{% endblock %}
+{% block body %}
+<div class="panel">
+  {% if company.is_demo %}
+  <p class="demo">This is sample data. <a href="/settings#start-fresh">Start your own book</a></p>
+  {% elif first_run %}
+  <section class="first-run">
+    <h2>Getting started</h2>
+    <ol>
+      <li><a href="/settings">Settings</a>: your business name, address, currency, and how customers pay you. They print on every invoice.</li>
+      <li><a href="/people">Add a customer</a> on the People page.</li>
+      <li><a href="/invoices/new">New invoice</a>: add the work, save it, then print it or mark it as sent.</li>
+    </ol>
+    <p class="hint">Want to look around first? Run <code>till demo</code>: it opens a sample business in a separate book, so nothing lands in this one.</p>
+  </section>
+  {% endif %}
+  <div class="row">
+    <h1>{{ brief.today | weekday }} {{ brief.today | long_date }}</h1>
+    <a class="btn quiet" href="/invoices/new">New invoice</a>
+  </div>
+  <p class="lede">Do the work. Till keeps the rest of {{ brief.today | weekday }}.</p>
+  <div class="metrics">
+    <div><strong class="money">{{ brief.cash_cents | money }}</strong><span>Cash</span></div>
+    <div><strong class="money">{{ brief.month_income_cents | money }}</strong><span>Invoiced this month</span></div>
+    <div><strong class="money">{{ brief.month_expense_cents | money }}</strong><span>Spent this month</span></div>
+    <div><strong class="money">{{ brief.overdue_cents | money }}</strong><span>Overdue</span></div>
+  </div>
+  {% if brief.other_currencies %}<p class="hint">These totals are in {{ company.currency }}. Some open invoices are {{ mixed_note(brief.other_currencies) }}.</p>{% endif %}
+
+  <h2>On the tools</h2>
+  {% if brief.events %}
+  <div class="table-wrap">
+  <table>
+    <tbody>
+    {% for e in brief.events %}
+      <tr>
+        <td class="nowrap">{{ e.start_at[11:16] }}</td>
+        <td>{{ e.title }}{% if e.customer_name %} · {{ e.customer_name }}{% endif %}{% if e.location %}<span class="sub">{{ e.location }}</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="lede">Nothing on the calendar. <a href="/calendar">Put a job on the page.</a></p>
+  {% endif %}
+
+  <h2>Who owes you</h2>
+  {% if brief.overdue %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Invoice</th><th scope="col">Customer</th><th scope="col" class="num">Balance</th><th scope="col"><span class="vh">Reminder</span></th></tr></thead>
+    <tbody>
+    {% for i in brief.overdue %}
+      <tr class="overdue">
+        <td><a href="/invoices/{{ i.id }}">{{ i.number }}</a><span class="sub">due {{ i.due_date }}</span></td>
+        <td>{{ i.customer_name }}</td>
+        <td class="num">{{ i.balance_cents | money(i.currency) }}</td>
+        <td>{% if i.chase %}<a href="{{ i.chase.mailto }}">Chase<span class="vh"> {{ i.customer_name }} about {{ i.number }}</span></a>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="lede">Nobody is late.</p>
+  {% endif %}
+
+  {% if brief.drafts %}
+  <h2>Still in draft</h2>
+  <div class="table-wrap">
+  <table>
+    <tbody>
+    {% for i in brief.drafts %}
+      <tr>
+        <td class="nowrap"><a href="/invoices/{{ i.id }}">{{ i.number }}</a></td>
+        <td>{{ i.customer_name }}</td>
+        <td class="num">{{ i.total_cents | money(i.currency) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+
+  <h2>Reviews waiting</h2>
+  {% if brief.reviews %}
+  <ul>
+    {% for r in brief.reviews %}
+      <li>{{ r.rating }}★ {{ r.author }} — {{ r.body }} <a href="/reviews">Reply</a></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="lede">Inbox is clear.</p>
+  {% endif %}
+</div>
+{% endblock %}

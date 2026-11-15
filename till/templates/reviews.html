@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Reviews{% endblock %}
+{% block body %}
+<h1>Reviews</h1>
+<p class="lede">Paste in what a customer wrote, write your reply here, then post it on Google (or wherever it was) yourself.</p>
+<form class="sheet" method="post" action="/reviews">
+  <label>Source
+    <select name="source">
+      <option value="google">Google</option>
+      <option value="yelp">Yelp</option>
+      <option value="facebook">Facebook</option>
+      <option value="telegram">Telegram</option>
+      <option value="other">Other</option>
+    </select>
+  </label>
+  <label>Their name <input name="author" required></label>
+  <label>Stars
+    <select name="rating">
+      {% for n in [5,4,3,2,1] %}<option value="{{ n }}">{{ n }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>What they said <textarea name="body" required></textarea></label>
+  <button type="submit">Save review</button>
+</form>
+{% for r in reviews %}
+<article>
+  {% set stars = r.rating if r.rating in [1, 2, 3, 4, 5] else 0 %}
+  <h2>{{ r.author }} <span class="stars">{{ "★" * stars }}{{ "☆" * (5 - stars) }}</span>
+    <span class="stamp {{ r.status }}">{{ r.status }}</span>
+  </h2>
+  <p>{{ r.body }}</p>
+  <p class="lede">{{ r.source }} · {{ r.received_at[:10] }}</p>
+  {% if r.reply_draft %}<p><strong>Draft:</strong> {{ r.reply_draft }}</p>{% endif %}
+  {% if r.status != 'replied' %}
+  <form class="sheet" method="post" action="/reviews/{{ r.id }}/draft">
+    <label>Reply <textarea name="body">{{ r.reply_draft or "" }}</textarea></label>
+    <div class="actions">
+      <button type="submit">Save reply draft</button>
+    </div>
+  </form>
+  <form method="post" action="/reviews/{{ r.id }}/replied"><button class="quiet" type="submit">Mark as replied<span class="vh">: {{ r.author }}</span></button></form>
+  {% endif %}
+</article>
+{% endfor %}
+{% endblock %}

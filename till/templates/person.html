@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ customer.name }}{% endblock %}
+{% block body %}
+<h1>{{ customer.name }}{% if customer.archived_at %} <span class="stamp void">Archived</span>{% endif %}</h1>
+<p class="lede">{{ customer.email or "" }} · {{ customer.phone or "" }}<br>{{ customer.address or "" }}</p>
+{% if customer.notes %}<p>{{ customer.notes }}</p>{% endif %}
+<div class="actions">
+  <a class="btn" href="/invoices/new?customer_id={{ customer.id }}">Invoice</a>
+  <a class="btn quiet" href="/quotes/new">Quote</a>
+</div>
+<details class="confirm">
+  <summary>Edit details…</summary>
+  <form class="sheet" method="post" action="/people/{{ customer.id }}/edit">
+    <label>Name <input name="name" value="{{ customer.name }}" required></label>
+    <label>Email <input name="email" type="email" value="{{ customer.email or '' }}"></label>
+    <label>Phone <input name="phone" value="{{ customer.phone or '' }}"></label>
+    <label>Address <textarea name="address">{{ customer.address or "" }}</textarea></label>
+    <label>Notes <textarea name="notes">{{ customer.notes or "" }}</textarea></label>
+    <button type="submit">Save</button>
+  </form>
+</details>
+{% if customer.archived_at %}
+<form method="post" action="/people/{{ customer.id }}/restore"><button class="quiet" type="submit">Restore to the lists</button></form>
+{% else %}
+<details class="confirm">
+  <summary>Archive…</summary>
+  <form method="post" action="/people/{{ customer.id }}/archive">
+    <p class="lede">Archiving hides {{ customer.name }} from lists and pickers. Their invoices, jobs and payments stay.</p>
+    <button type="submit">Yes, archive</button>
+  </form>
+</details>
+{% endif %}
+<h2>Invoices</h2>
+{% if invoices %}
+<div class="table-wrap">
+<table>
+  <tbody>
+  {% for i in invoices %}
+    <tr>
+      <td><a href="/invoices/{{ i.id }}">{{ i.number }}</a></td>
+      <td>{{ i.status }}</td>
+      <td class="num">{{ i.balance_cents | money(i.currency) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="lede">No invoices yet.</p>
+{% endif %}
+<h2>Jobs</h2>
+{% if jobs %}
+<ul>
+  {% for j in jobs %}<li>{{ j.title }} · {{ j.status }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Till
+Comment=Local small-business daybook
+Exec=env @DB@ @TILL@ open --port @PORT@
+Icon=accessories-calculator
+Terminal=false
+Categories=Office;Finance;
+StartupNotify=true

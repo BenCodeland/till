@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Books{% endblock %}
+{% block body %}
+<h1>Books</h1>
+{% if not balanced %}
+<p class="error" role="alert">Something in the books doesn't add up (the journal is off balance). Stop, make a backup with <code>till backup</code>, and get help before entering more.</p>
+{% endif %}
+<p class="summary money">{{ period }} {% if pnl.net_cents >= 0 %}you've made {{ pnl.net_cents | money }}{% else %}you're down {{ (0 - pnl.net_cents) | money }}{% endif %}: you invoiced {{ pnl.income_cents | money }} (before sales tax) and spent {{ pnl.expense_cents | money }} on expenses.</p>
+<p class="hint">"Invoiced" counts the invoices you have sent that are dated in this period, paid or not (drafts and voided invoices don't count). Sales tax you collect isn't yours, so it's left out. The money that has actually come in shows in Cash.</p>
+<div class="metrics">
+  <div><strong class="money">{{ cash_cents | money }}</strong><span>Cash</span></div>
+  <div><strong class="money">{{ pnl.income_cents | money }}</strong><span>Invoiced</span></div>
+  <div><strong class="money">{{ pnl.expense_cents | money }}</strong><span>Spent</span></div>
+  <div><strong class="money">{{ pnl.net_cents | money }}</strong><span>Made</span></div>
+</div>
+{% if aging.other_currencies %}<p class="hint">These totals are in {{ company.currency }}. Some open invoices are {{ mixed_note(aging.other_currencies) }}.</p>{% endif %}
+<form class="sheet period" method="get" action="/books">
+  <label>From <input type="date" name="start" value="{{ start }}"></label>
+  <label>To <input type="date" name="end" value="{{ end }}"></label>
+  <button class="quiet" type="submit">Show these dates</button>
+</form>
+
+<h2>Log an expense</h2>
+<form class="sheet" method="post" action="/books/expenses">
+  <label>Paid to <input name="vendor_name" required placeholder="City Hardware"></label>
+  <div class="pair">
+    <label>Amount <input name="amount" required placeholder="34.99" inputmode="decimal"></label>
+    <label>Date <input type="date" name="spent_on" value="{{ today }}"></label>
+  </div>
+  <label>Category
+    <select name="account_code">
+      {% for a in accounts if a.type=='expense' %}
+        <option value="{{ a.code }}">{{ a.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>What for (optional) <input name="memo"></label>
+  <button type="submit">Record expense</button>
+</form>
+{% if expenses %}
+<h2>Recent expenses</h2>
+<div class="table-wrap">
+<table>
+  <thead><tr><th scope="col">Paid to</th><th scope="col">Category</th><th scope="col" class="num">Amount</th><th scope="col"><span class="vh">Fix</span></th></tr></thead>
+  <tbody>
+  {% for e in expenses %}
+    <tr class="{{ 'reversed' if e.reversed_at }}">
+      <td>{{ e.vendor_name }}<span class="sub">{{ e.spent_on }}{% if e.memo %} · {{ e.memo }}{% endif %}</span></td>
+      <td>{{ e.account_name }}</td>
+      <td class="num">{% if e.reversed_at %}<del>{{ e.amount_cents | money }}</del>{% else %}{{ e.amount_cents | money }}{% endif %}</td>
+      <td>
+        {% if e.reversed_at %}reversed
+        {% else %}
+        <details class="confirm">
+          <summary>Reverse…</summary>
+          <form method="post" action="/books/expenses/{{ e.id }}/reverse">
+            <button type="submit">Yes, reverse {{ e.amount_cents | money }}</button>
+          </form>
+        </details>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<h2>Who owes you</h2>
+{% if aging.invoices %}
+<div class="table-wrap">
+<table>
+  <tbody>
+  {% for i in aging.invoices %}
+    <tr class="{{ 'overdue' if i.days_overdue }}">
+      <td><a href="/invoices/{{ i.id }}">{{ i.number }}</a></td>
+      <td>{{ i.customer_name }}</td>
+      <td>{% if i.days_overdue == 1 %}1 day late{% elif i.days_overdue %}{{ i.days_overdue }} days late{% else %}not due yet{% endif %}</td>
+      <td class="num">{{ i.balance_cents | money(i.currency) }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="lede">Nobody owes you anything right now.</p>
+{% endif %}
+
+<section class="accountant" aria-labelledby="accountant-heading">
+  <h2 id="accountant-heading">For your accountant</h2>
+  <p class="hint">The same numbers in bookkeeping terms. You don't need these day to day.</p>
+  <dl class="explained">
+    <dt>Journal</dt>
+    <dd>{{ "The journal is balanced: every entry's debits equal its credits." if balanced else "The journal is off balance: debits and credits don't match. Something is wrong." }}
+      Till keeps double-entry books, so each sale, payment and expense is recorded twice.</dd>
+    <dt>Accounts receivable (AR)</dt>
+    <dd>Money customers owe you, by how late it is:
+      <span class="money">{{ aging.total_cents | money }}</span> in all ·
+      not yet due <span class="money">{{ aging.current_cents | money }}</span> ·
+      1–30 days late <span class="money">{{ aging.days_1_30_cents | money }}</span> ·
+      31–60 <span class="money">{{ aging.days_31_60_cents | money }}</span> ·
+      61–90 <span class="money">{{ aging.days_61_90_cents | money }}</span> ·
+      over 90 <span class="money">{{ aging.days_90_plus_cents | money }}</span></dd>
+    <dt>Voided invoices</dt>
+    <dd id="void-note">A void is recorded on the day you void the invoice, not on the invoice's own date. Voiding an invoice from an earlier month takes its income off the month you void it in, so that month can show less income than you invoiced, even below zero.</dd>
+  </dl>
+  {% if pnl.accounts %}
+  <p class="hint">Profit and loss by account, {{ start }} to {{ end }}. The number is the account's code in the chart of accounts.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th scope="col">Account</th><th scope="col" class="num">Amount</th></tr></thead>
+    <tbody>
+    {% for a in pnl.accounts %}
+      <tr><td>{{ a.code }} {{ a.name }}</td><td class="num">{{ a.n | money }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

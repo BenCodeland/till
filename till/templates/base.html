@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ company.name }}{% endblock %} · Till</title>
+  <link rel="stylesheet" href="/static/till.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the page</a>
+  <div class="shell">
+    <aside class="cover">
+      <a class="mark" href="/">Till
+        <small>{{ company.name }}</small>
+      </a>
+      <nav>
+        <a href="/" class="{{ 'active' if nav=='today' }}"{% if nav=='today' %} aria-current="page"{% endif %}>Today</a>
+        <a href="/invoices" class="{{ 'active' if nav=='invoices' }}"{% if nav=='invoices' %} aria-current="page"{% endif %}>Invoices</a>
+        <a href="/people" class="{{ 'active' if nav=='people' }}"{% if nav=='people' %} aria-current="page"{% endif %}>People</a>
+        <a href="/jobs" class="{{ 'active' if nav=='jobs' }}"{% if nav=='jobs' %} aria-current="page"{% endif %}>Jobs</a>
+        <a href="/books" class="{{ 'active' if nav=='books' }}"{% if nav=='books' %} aria-current="page"{% endif %}>Books</a>
+        <a href="/calendar" class="{{ 'active' if nav=='calendar' }}"{% if nav=='calendar' %} aria-current="page"{% endif %}>Calendar</a>
+        <a href="/reviews" class="{{ 'active' if nav=='reviews' }}"{% if nav=='reviews' %} aria-current="page"{% endif %}>Reviews</a>
+        <a href="/settings" class="{{ 'active' if nav=='settings' }}"{% if nav=='settings' %} aria-current="page"{% endif %}>Settings</a>
+      </nav>
+    </aside>
+    <main class="page" id="main" tabindex="-1">
+      {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+      {% if saved %}<p class="saved" role="status">{{ saved }}</p>{% endif %}
+      {% block body %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>
