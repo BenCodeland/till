@@ -44,6 +44,8 @@ one SQLite file.
   VAT-inclusive prices or tax returns.
 - **Linux first.** See Requirements.
 
+Some of these are planned: see the [roadmap](ROADMAP.md).
+
 ## Requirements
 
 - **Linux.** That is where Till is built and tested.
@@ -59,7 +61,7 @@ one SQLite file.
 ## Install
 
 ```bash
-git clone <this repository's URL> till
+git clone https://github.com/BenCodeland/till.git till
 cd till
 python3 -m venv .venv
 .venv/bin/pip install -e .
@@ -161,10 +163,15 @@ Settings → Advanced shows the path. `data/` is ignored by git, so
   yours.
 - Other websites can't read or change your books through your browser.
   Changes coming from another site are refused, and so is any `Host`
-  other than `127.0.0.1` or `localhost`, which blocks DNS-rebinding tricks.
+  other than `127.0.0.1`, `localhost` or `[::1]`, which blocks DNS-rebinding
+  tricks.
   The API only accepts JSON bodies, so a web form can't post to it.
-- Till makes no outside network requests of its own. Your books stay on
-  this computer unless you copy them somewhere.
+- Till's own code only connects to this computer. The one exception is
+  `till telegram-brief`, which you run yourself: it hands today's summary
+  to Hermes to send through Telegram. Otherwise your books stay on this
+  computer unless you copy them somewhere.
+
+To report a security problem privately, see [SECURITY.md](SECURITY.md).
 
 ## The API, for scripts and AI assistants (optional)
 
@@ -202,6 +209,10 @@ same API.
 The tests use temporary books. The installer tests run against a fake
 home directory and a fake `systemctl`, so they never touch your real
 login session.
+
+How to report a bug, and how outside changes get in, is in
+[CONTRIBUTING.md](CONTRIBUTING.md). Changes are listed in the
+[changelog](CHANGELOG.md).
 
 ## Licence
 

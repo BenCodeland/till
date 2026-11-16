@@ -2,6 +2,22 @@
 name = "till"
 version = "0.1.0"
 description = "Local small-business daybook: invoices, books, calendar, reviews."
+readme = "README.md"
+authors = [{ name = "Ben C" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Web Environment",
+  "Framework :: FastAPI",
+  "Intended Audience :: End Users/Desktop",
+  "Natural Language :: English",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Office/Business :: Financial :: Accounting",
+]
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -11,6 +27,12 @@ dependencies = [
   "jinja2>=3.1",
   "python-multipart>=0.0.12",
 ]
+
+[project.urls]
+Homepage = "https://github.com/BenCodeland/till"
+Source = "https://github.com/BenCodeland/till"
+Issues = "https://github.com/BenCodeland/till/issues"
+Changelog = "https://github.com/BenCodeland/till/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "httpx>=0.27"]
